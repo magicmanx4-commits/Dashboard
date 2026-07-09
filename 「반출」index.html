@@ -1,0 +1,1655 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>동아에스티 송도캠퍼스 제조팀 포장 대시보드</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-100 font-sans text-gray-800">
+
+    <input type="file" id="restore-file-input" accept=".json" onchange="handleRestoreFile(event)" class="hidden">
+
+    <div class="flex h-screen overflow-hidden">
+        
+        <aside class="w-64 bg-slate-900 text-white flex flex-col justify-between shrink-0">
+            <div>
+                <div class="p-5 border-b border-slate-700 flex flex-col items-center text-center">
+                    <div class="font-bold text-xl tracking-wider text-blue-400">DONG-A ST</div>
+                    <div class="text-xs font-semibold text-gray-300 mt-1">송도캠퍼스 제조팀 포장 대시보드</div>
+                </div>
+                <nav class="p-4 space-y-1">
+                    <button onclick="switchTab('dashboard')" id="btn-dashboard" class="menu-btn w-full text-left px-4 py-3 rounded-lg bg-blue-600 text-white font-medium flex items-center gap-3 transition">
+                        <span>📊</span> 생산 대시보드
+                    </button>
+                    <button onclick="switchTab('half-wait')" id="btn-half-wait" class="menu-btn w-full text-left px-4 py-3 rounded-lg text-gray-300 hover:bg-slate-800 flex items-center gap-3 transition">
+                        <span>⏳</span> 반제품 대기 제품
+                    </button>
+                    <button onclick="switchTab('prod-complete')" id="btn-prod-complete" class="menu-btn w-full text-left px-4 py-3 rounded-lg text-gray-300 hover:bg-slate-800 flex items-center gap-3 transition">
+                        <span>✅</span> 생산 완료 제품
+                    </button>
+                    <button onclick="switchTab('ship-wait')" id="btn-ship-wait" class="menu-btn w-full text-left px-4 py-3 rounded-lg text-gray-300 hover:bg-slate-800 flex items-center gap-3 transition">
+                        <span>📦</span> 출하 대기 제품
+                    </button>
+                    <button onclick="switchTab('ship-complete')" id="btn-ship-complete" class="menu-btn w-full text-left px-4 py-3 rounded-lg text-gray-300 hover:bg-slate-800 flex items-center gap-3 transition">
+                        <span>🚚</span> 출하 완료 제품
+                    </button>
+                </nav>
+            </div>
+            <div class="p-4 text-center text-xs text-gray-500 border-t border-slate-800">
+                © DONG-A ST Songdo Campus.
+            </div>
+        </aside>
+
+        <main class="flex-1 flex flex-col overflow-hidden">
+            
+            <header class="bg-white shadow-sm px-6 py-4 flex items-center justify-between border-b border-gray-200 shrink-0">
+                <div class="flex items-center gap-6">
+                    <div class="flex items-center gap-2">
+                        <label for="target-date" class="font-semibold text-gray-700 text-sm">📅 작업 기준일:</label>
+                        <input type="date" id="target-date" onchange="loadDateData()" class="border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    
+                    <div class="flex items-center gap-3 bg-slate-100 p-1.5 rounded-lg border border-slate-200">
+                        <span id="lock-status-badge" class="text-xs font-bold px-2 py-1 rounded bg-amber-100 text-amber-800 flex items-center gap-1">
+                            🔒 보기 전용 모드
+                        </span>
+                        <button id="btn-lock-toggle" onclick="toggleDashboardLock()" class="bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold px-3 py-1.5 rounded transition shadow-sm">
+                            🔓 편집 잠금 해제
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <button onclick="exportSystemDB()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-1.5 rounded transition shadow-sm flex items-center gap-1">
+                        📥 데이터 백업 (JSON)
+                    </button>
+                    <button onclick="triggerRestoreFileInput()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-3 py-1.5 rounded transition shadow-sm flex items-center gap-1 lockable-input">
+                        📤 데이터 복원 (JSON)
+                    </button>
+                </div>
+            </header>
+
+            <div class="flex-1 overflow-y-auto p-6">
+                
+                <section id="tab-dashboard" class="tab-content space-y-6">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-2xl font-bold text-gray-900">일일 생산 계획 보고서 요약</h2>
+                        <div class="flex items-center gap-2">
+                            <span id="dashboard-date-display" class="text-sm font-semibold bg-gray-200 text-gray-700 px-3 py-1 rounded-full">2026-07-07</span>
+                            <button onclick="changeYearlyDatabase()" class="bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs px-3 py-1.5 rounded-full transition shadow-sm flex items-center gap-1 lockable-input">
+                                🔄 연도 데이터 전환
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="bg-gradient-to-r from-slate-900 to-slate-800 text-white p-5 rounded-xl shadow-md border border-slate-700">
+                        <div class="flex justify-between items-center mb-3 border-b border-slate-700 pb-2">
+                            <h3 class="font-bold text-sm text-blue-400 flex items-center gap-2">
+                                <span>🎯 <span id="summary-active-year">2026</span>년 연간 생산 및 출하 목표 달성 현황</span>
+                            </h3>
+                            <button onclick="editYearlyTargetGoal()" class="text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 px-2.5 py-1 rounded font-bold transition lockable-input">
+                                ✏️ 목표 수정
+                            </button>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="bg-slate-800/80 p-4 rounded-lg border border-slate-700 flex justify-between items-center">
+                                <div>
+                                    <div class="text-xs text-slate-400 font-bold mb-1">생산 완료 누적 로트</div>
+                                    <div class="text-2xl font-black text-emerald-400 font-mono" id="dash-summary-prod-lots">0 Lot</div>
+                                    <div class="text-[11px] text-slate-400 mt-1">목표: <span id="dash-target-prod-goal">203</span> Lot</div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="text-xs text-slate-400 font-bold mb-1">달성률</div>
+                                    <div class="text-2xl font-black text-emerald-400 font-mono" id="dash-summary-prod-pct">0.00%</div>
+                                </div>
+                            </div>
+
+                            <div class="bg-slate-800/80 p-4 rounded-lg border border-slate-700 flex justify-between items-center">
+                                <div>
+                                    <div class="text-xs text-slate-400 font-bold mb-1">출하 완료 누적 로트</div>
+                                    <div class="text-2xl font-black text-blue-400 font-mono" id="dash-summary-ship-lots">0 Lot</div>
+                                    <div class="text-[11px] text-slate-400 mt-1">목표: <span id="dash-target-ship-goal">203</span> Lot</div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="text-xs text-slate-400 font-bold mb-1">달성률</div>
+                                    <div class="text-2xl font-black text-blue-400 font-mono" id="dash-summary-ship-pct">0.00%</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
+                        <h3 class="font-bold text-gray-700 mb-4 border-b pb-2 flex justify-between items-center">
+                            <span>👥 1. 인원현황</span>
+                            <span class="text-xs text-gray-400">* 쉼표(,)로 구분입력 시 자동 계산</span>
+                        </h3>
+                        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3 mb-6">
+                            <div class="bg-slate-50 p-2 rounded border border-gray-200">
+                                <label class="block text-xs font-bold text-slate-600 mb-1">공정관리</label>
+                                <input type="text" id="input-manager" oninput="handleAttendanceInput()" class="lockable-input w-full text-xs p-1.5 border rounded bg-white">
+                            </div>
+                            <div class="bg-slate-50 p-2 rounded border border-gray-200">
+                                <label class="block text-xs font-bold text-slate-600 mb-1">자재소분</label>
+                                <input type="text" id="input-material" oninput="handleAttendanceInput()" class="lockable-input w-full text-xs p-1.5 border rounded bg-white">
+                            </div>
+                            <div class="bg-red-50 p-2 rounded border border-red-100">
+                                <label class="block text-xs font-bold text-red-700 mb-1">휴가</label>
+                                <input type="text" id="input-leave" oninput="handleAttendanceInput()" class="lockable-input w-full text-xs p-1.5 border rounded bg-white">
+                            </div>
+                            <div class="bg-amber-50 p-2 rounded border border-amber-100">
+                                <label class="block text-xs font-bold text-amber-700 mb-1">지원</label>
+                                <input type="text" id="input-support" oninput="handleAttendanceInput()" class="lockable-input w-full text-xs p-1.5 border rounded bg-white">
+                            </div>
+                            <div class="bg-gray-50 p-2 rounded border border-gray-200">
+                                <label class="block text-xs font-bold text-gray-700 mb-1">휴직</label>
+                                <input type="text" id="input-suspend" oninput="handleAttendanceInput()" class="lockable-input w-full text-xs p-1.5 border rounded bg-white">
+                            </div>
+                            <div class="bg-blue-50 p-2 rounded border border-blue-100">
+                                <label class="block text-xs font-bold text-blue-700 mb-1">교육</label>
+                                <input type="text" id="input-education" oninput="handleAttendanceInput()" class="lockable-input w-full text-xs p-1.5 border rounded bg-white">
+                            </div>
+                            <div class="bg-indigo-50 p-2 rounded border border-indigo-100">
+                                <label class="block text-xs font-bold text-indigo-700 mb-1">출장</label>
+                                <input type="text" id="input-trip" oninput="handleAttendanceInput()" class="lockable-input w-full text-xs p-1.5 border rounded bg-white">
+                            </div>
+                            <div class="bg-orange-50 p-2 rounded border border-orange-100">
+                                <label class="block text-xs font-bold text-orange-700 mb-1">병가</label>
+                                <input type="text" id="input-sick" oninput="handleAttendanceInput()" class="lockable-input w-full text-xs p-1.5 border rounded bg-white">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                            <div class="bg-slate-900 text-white p-3 rounded-lg"><div class="text-xs text-slate-400">총원</div><div class="text-lg font-bold">11명</div></div>
+                            <div class="bg-blue-600 text-white p-3 rounded-lg"><div class="text-xs text-blue-200">현재원 (남)</div><div id="calc-male" class="text-xl font-black">5명</div></div>
+                            <div class="bg-rose-500 text-white p-3 rounded-lg"><div class="text-xs text-rose-200">현재원 (여)</div><div id="calc-female" class="text-xl font-black">6명</div></div>
+                            <div class="bg-emerald-600 text-white p-3 rounded-lg"><div class="text-xs text-emerald-200">현재원 합계</div><div id="calc-total" class="text-xl font-black">11명</div></div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
+                        <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">📦 2. 실시간 반제품 대기 및 완제품 수량 현황</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-xs border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+                                        <th class="p-2.5">제품명</th>
+                                        <th class="p-2.5">Lot Size</th>
+                                        <th class="p-2.5 text-blue-600">병1 대기 (Lot)</th>
+                                        <th class="p-2.5 text-indigo-600">병2 대기 (Lot)</th>
+                                        <th class="p-2.5 text-amber-600">PTP 대기 (Lot)</th>
+                                        <th class="p-2.5 bg-emerald-50 text-emerald-700 font-bold">생산완료 누적 수량</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dash-live-status-body" class="divide-y divide-gray-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
+                        <div class="flex justify-between items-center mb-4 border-b pb-2">
+                            <h3 class="font-bold text-gray-700 flex items-center gap-2">🎬 3. 실시간 현황</h3>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-xs border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-800 text-white font-medium">
+                                        <th class="p-2.5">생산 라인</th>
+                                        <th class="p-2.5 w-1/5">현재 생산 진행 제품 선택</th>
+                                        <th class="p-2.5 w-1/5">Batch No 입력</th>
+                                        <th class="p-2.5 w-1/6">생산 수량 입력 (EA)</th>
+                                        <th class="p-2.5 w-1/6">작업자 이름 입력</th>
+                                        <th class="p-2.5 text-center">작업 제어 액션</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dash-control-panel-body" class="divide-y divide-gray-200"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="tab-half-wait" class="tab-content hidden space-y-6">
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                        <div class="flex justify-between items-center mb-2">
+                            <h2 class="text-xl font-bold text-slate-800">⏳ 반제품 대기 제품 관리 목록</h2>
+                            <span class="text-xs text-rose-600 font-bold bg-rose-50 px-2 py-1 rounded border border-rose-100 lock-alert-msg">상단 잠금 해제 시 입력 가능</span>
+                        </div>
+                        <p class="text-xs text-gray-500 mb-4">각 제품을 클릭하면 대기 중인 상세 **제조번호(Batch No)** 목록을 확인하실 수 있습니다.</p>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div class="border border-blue-200 rounded-lg overflow-hidden bg-white shadow-sm">
+                                <div class="bg-blue-600 text-white font-bold p-3 text-sm flex justify-between items-center">
+                                    <span>🔹 병 1 라인 대기 목록</span>
+                                    <span id="line-1-count-badge" class="bg-blue-800 text-xs px-2 py-0.5 rounded-full">0 Lot</span>
+                                </div>
+                                <div class="p-3 space-y-3 bg-blue-50/20 min-h-[300px] max-h-[500px] overflow-y-auto" id="wait-line-1"></div>
+                            </div>
+                            <div class="border border-indigo-200 rounded-lg overflow-hidden bg-white shadow-sm">
+                                <div class="bg-indigo-600 text-white font-bold p-3 text-sm flex justify-between items-center">
+                                    <span>🔹 병 2 라인 대기 목록</span>
+                                    <span id="line-2-count-badge" class="bg-indigo-800 text-xs px-2 py-0.5 rounded-full">0 Lot</span>
+                                </div>
+                                <div class="p-3 space-y-3 bg-indigo-50/20 min-h-[300px] max-h-[500px] overflow-y-auto" id="wait-line-2"></div>
+                            </div>
+                            <div class="border border-amber-200 rounded-lg overflow-hidden bg-white shadow-sm">
+                                <div class="bg-amber-600 text-white font-bold p-3 text-sm flex justify-between items-center">
+                                    <span>🔸 PTP 라인 대기 목록</span>
+                                    <span id="line-3-count-badge" class="bg-amber-800 text-xs px-2 py-0.5 rounded-full">0 Lot</span>
+                                </div>
+                                <div class="p-3 space-y-3 bg-amber-50/20 min-h-[300px] max-h-[500px] overflow-y-auto" id="wait-line-3"></div>
+                            </div>
+                        </div>
+
+                        <div class="mt-6 bg-slate-900 text-white p-4 rounded-xl shadow-md border border-slate-800">
+                            <h3 class="text-xs font-bold text-blue-400 mb-3 flex items-center gap-2">
+                                <span>➕ 반제품 대기 항목 신규 등록</span>
+                                <span class="text-[11px] text-gray-400 font-normal">(제품과 제조번호를 입력 후 추가버튼을 눌러주세요)</span>
+                            </h3>
+                            <div class="grid grid-cols-1 md:grid-cols-4 gap-3 items-center">
+                                <div>
+                                    <label class="block text-[11px] text-gray-300 font-bold mb-1">생산 라인 선택</label>
+                                    <select id="add-wait-line-select" onchange="updateAddWaitProductOptions()" class="w-full bg-slate-800 text-xs border border-slate-700 rounded p-2 text-white font-bold focus:ring-2 focus:ring-blue-500">
+                                        <option value="병1">병 1 라인</option>
+                                        <option value="병2" selected>병 2 라인</option>
+                                        <option value="PTP">PTP 라인</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] text-gray-300 font-bold mb-1">제품 선택</label>
+                                    <select id="add-wait-product-select" class="w-full bg-slate-800 text-xs border border-slate-700 rounded p-2 text-blue-300 font-bold focus:ring-2 focus:ring-blue-500"></select>
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] text-gray-300 font-bold mb-1">제품 제조번호 (Batch No)</label>
+                                    <input type="text" id="add-wait-batch-input" placeholder="예: SXTS2606046" class="w-full bg-slate-800 text-xs border border-slate-700 rounded p-2 text-white font-mono focus:ring-2 focus:ring-blue-500">
+                                </div>
+                                <div class="md:pt-5">
+                                    <button onclick="addWaitLotItem()" id="btn-add-wait-lot" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded text-xs transition shadow flex items-center justify-center gap-1">
+                                        ➕ 대기 제품 추가
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="tab-prod-complete" class="tab-content hidden space-y-6">
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                        <div class="flex justify-between items-center mb-4 border-b pb-2">
+                            <div class="flex items-center gap-3">
+                                <h2 class="text-xl font-bold text-slate-800">✅ 생산 완료 제품 데이터베이스</h2>
+                                <span id="history-date-badge" class="text-xs font-bold px-2.5 py-1 bg-blue-100 text-blue-800 rounded-md">조회일: 2026-07-07</span>
+                            </div>
+                            <span class="text-xs text-rose-600 font-bold bg-rose-50 px-2 py-1 rounded border border-rose-100 lock-alert-msg">상단 잠금 해제 시 수량 수정/삭제 가능 (삭제 시 출하 대기 항목도 자동 삭제)</span>
+                        </div>
+                        
+                        <div class="overflow-x-auto mb-4">
+                            <table class="w-full text-left text-xs border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-100 text-slate-700 font-bold border-b border-slate-300">
+                                        <th class="p-2.5">완료 타임스탬프</th>
+                                        <th class="p-2.5">제품명</th>
+                                        <th class="p-2.5 text-blue-700">Batch No</th>
+                                        <th class="p-2.5 text-emerald-700">생산 수량 (EA)</th>
+                                        <th class="p-2.5 text-slate-700">담당 작업자</th>
+                                        <th class="p-2.5 text-indigo-700 text-center">증가 로트</th>
+                                        <th class="p-2.5 text-center">상태 및 액션</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="prod-complete-history-body" class="divide-y divide-gray-100"></tbody>
+                            </table>
+                            <div id="history-empty-placeholder" class="hidden p-8 text-center text-xs text-gray-400 bg-gray-50 rounded-b-lg border border-t-0 border-gray-200">
+                                📅 해당 작업 기준일로 전송 및 기록된 실시간 생산 완료 정보가 현재 존재하지 않습니다.
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-50 p-4 rounded-xl border border-gray-200 mt-4">
+                            <h3 class="text-xs font-bold text-slate-700 mb-3">📊 전체 제품 현재 누적 생산 로트수 요약 현황</h3>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 text-left" id="total-lot-summary-box"></div>
+                            <div class="mt-4 pt-3 border-t border-gray-200 flex justify-between items-center px-2">
+                                <span class="text-xs font-bold text-slate-700">공장 전체 누적 생산 총계:</span>
+                                <span class="text-sm font-black text-blue-600" id="grand-total-lots">0 로트</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="tab-ship-wait" class="tab-content hidden space-y-6">
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                        <div class="flex justify-between items-center mb-2">
+                            <h2 class="text-xl font-bold text-slate-800">📦 출하 대기 및 승인 목록</h2>
+                            <span class="text-xs text-rose-600 font-bold bg-rose-50 px-2 py-1 rounded border border-rose-100 lock-alert-msg">상단 잠금 해제 시 출하 승인 가능</span>
+                        </div>
+                        <p class="text-xs text-gray-500 mb-4">생산 완료 후 출하 검사 대기 구역입니다. 생산 완료 취소 시 해당 출하 대기 품목도 자동 연동 삭제됩니다.</p>
+                        
+                        <div id="ship-wait-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+                        
+                        <div id="ship-wait-empty" class="hidden p-8 text-center text-xs text-gray-400 bg-gray-50 rounded-lg border border-gray-200">
+                            📦 현재 출하 대기 중인 제품이 없습니다.
+                        </div>
+                    </div>
+                </section>
+
+                <section id="tab-ship-complete" class="tab-content hidden space-y-6">
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                        <div class="flex justify-between items-center mb-4 border-b pb-2">
+                            <h2 class="text-xl font-bold text-slate-800">🚚 출하 완료 제품 데이터베이스</h2>
+                            <span class="text-xs font-bold px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-md">최종 출하 완료 현황</span>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                            <div class="bg-gradient-to-br from-emerald-600 to-teal-700 text-white p-4 rounded-xl shadow-sm">
+                                <div class="text-xs text-emerald-100 font-bold mb-1">공장 전체 누적 포장 수량 총계</div>
+                                <div class="text-2xl font-black font-mono" id="ship-grand-total-ea">0 EA</div>
+                            </div>
+                            <div class="bg-gradient-to-br from-indigo-600 to-blue-700 text-white p-4 rounded-xl shadow-sm">
+                                <div class="text-xs text-indigo-100 font-bold mb-1">공장 전체 누적 정제/캡슐 총계</div>
+                                <div class="text-2xl font-black font-mono" id="ship-grand-total-unit">0 Unit</div>
+                            </div>
+                            <div class="bg-gradient-to-br from-slate-800 to-slate-900 text-white p-4 rounded-xl shadow-sm">
+                                <div class="text-xs text-slate-400 font-bold mb-1">총 출하 완료 로트 합계</div>
+                                <div class="text-2xl font-black font-mono text-emerald-400" id="ship-grand-total-lots">0 Lot</div>
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-50 p-5 rounded-xl border border-gray-200 mb-6 space-y-4">
+                            <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2 border-b pb-2">
+                                <span>📈 월별 출하 실적 및 누적 추이 차트 (Unit)</span>
+                            </h3>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-center text-xs border border-gray-300 bg-white font-mono">
+                                    <thead>
+                                        <tr class="bg-slate-800 text-white font-bold">
+                                            <th class="p-2 border border-slate-700" id="monthly-table-year-header">2026년</th>
+                                            <th class="p-2 border border-slate-700">1월</th>
+                                            <th class="p-2 border border-slate-700">2월</th>
+                                            <th class="p-2 border border-slate-700">3월</th>
+                                            <th class="p-2 border border-slate-700">4월</th>
+                                            <th class="p-2 border border-slate-700">5월</th>
+                                            <th class="p-2 border border-slate-700">6월</th>
+                                            <th class="p-2 border border-slate-700">7월</th>
+                                            <th class="p-2 border border-slate-700">8월</th>
+                                            <th class="p-2 border border-slate-700">9월</th>
+                                            <th class="p-2 border border-slate-700">10월</th>
+                                            <th class="p-2 border border-slate-700">11월</th>
+                                            <th class="p-2 border border-slate-700">12월</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-200">
+                                        <tr>
+                                            <td class="p-2 font-bold bg-slate-100 text-slate-800 border">월별 생산 Unit</td>
+                                            <td class="p-2 border" id="m-val-1">-</td><td class="p-2 border" id="m-val-2">-</td>
+                                            <td class="p-2 border" id="m-val-3">-</td><td class="p-2 border" id="m-val-4">-</td>
+                                            <td class="p-2 border" id="m-val-5">-</td><td class="p-2 border" id="m-val-6">-</td>
+                                            <td class="p-2 border" id="m-val-7">-</td><td class="p-2 border" id="m-val-8">-</td>
+                                            <td class="p-2 border" id="m-val-9">-</td><td class="p-2 border" id="m-val-10">-</td>
+                                            <td class="p-2 border" id="m-val-11">-</td><td class="p-2 border" id="m-val-12">-</td>
+                                        </tr>
+                                        <tr class="bg-orange-50/50 font-bold text-orange-900">
+                                            <td class="p-2 font-bold bg-amber-100 text-amber-900 border">누적 Unit</td>
+                                            <td class="p-2 border" id="m-cum-1">-</td><td class="p-2 border" id="m-cum-2">-</td>
+                                            <td class="p-2 border" id="m-cum-3">-</td><td class="p-2 border" id="m-cum-4">-</td>
+                                            <td class="p-2 border" id="m-cum-5">-</td><td class="p-2 border" id="m-cum-6">-</td>
+                                            <td class="p-2 border" id="m-cum-7">-</td><td class="p-2 border" id="m-cum-8">-</td>
+                                            <td class="p-2 border" id="m-cum-9">-</td><td class="p-2 border" id="m-cum-10">-</td>
+                                            <td class="p-2 border" id="m-cum-11">-</td><td class="p-2 border" id="m-cum-12">-</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="bg-white p-4 rounded-lg border border-gray-200 h-72">
+                                <canvas id="monthlyUnitChart"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="flex justify-between items-center mb-3">
+                            <h3 class="text-xs font-bold text-slate-700">📋 상세 출하 완료 내역 목록</h3>
+                            <div class="flex items-center gap-2">
+                                <label for="ship-sort-select" class="text-xs font-bold text-gray-600">📅 출하 승인일 정렬:</label>
+                                <select id="ship-sort-select" onchange="renderShipCompleteTab()" class="text-xs border border-gray-300 rounded px-2.5 py-1 font-bold bg-white text-slate-700">
+                                    <option value="asc">⬆️ 출하 승인일 오름차순 (날짜순)</option>
+                                    <option value="desc">⬇️ 출하 승인일 내림차순 (최신순)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="overflow-x-auto mb-6">
+                            <table class="w-full text-left text-xs border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-100 text-slate-700 font-bold border-b border-slate-300">
+                                        <th class="p-2.5">출하 승인일</th>
+                                        <th class="p-2.5">제품명</th>
+                                        <th class="p-2.5 text-blue-700">Batch No</th>
+                                        <th class="p-2.5 text-emerald-700 text-right">출하 포장 수량 (EA)</th>
+                                        <th class="p-2.5 text-indigo-700 text-right">총 정제/캡슐 수량 (Unit)</th>
+                                        <th class="p-2.5 text-center">상태</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ship-complete-history-body" class="divide-y divide-gray-100"></tbody>
+                            </table>
+                            <div id="ship-complete-empty" class="hidden p-8 text-center text-xs text-gray-400 bg-gray-50 rounded-b-lg border border-t-0 border-gray-200">
+                                🚚 출하 완료 기록이 존재하지 않습니다.
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-50 p-4 rounded-xl border border-gray-200">
+                            <div class="flex justify-between items-center mb-3 border-b pb-2">
+                                <h3 class="text-xs font-bold text-slate-700">🎯 제품별 출하 목표 대비 달성률(%) 및 실적 요약</h3>
+                                <span class="text-[11px] text-gray-400 lock-alert-msg">* 편집 잠금 해제 시 목표 수량 변경 가능</span>
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 text-left" id="ship-complete-summary-box"></div>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:3000/api';
+
+        const teamMembers = {
+            "장원용": { gender: "남" }, "김경원": { gender: "남" }, "정영훈": { gender: "남" },
+            "지윤배": { gender: "남" }, "송현": { gender: "남" },
+            "고다영": { gender: "여" }, "이나영": { gender: "여" }, "이사랑": { gender: "여" },
+            "이지우": { gender: "여" }, "박여진": { gender: "여" }, "유주연": { gender: "여" }
+        };
+
+        const productMaster = {
+            "SMTS30":   { line: "병1", size: "12333EA" },
+            "SMFS30":   { line: "병1", size: "15000(1)" },
+            "SLTS30":   { line: "병1", size: "93333(4)" },
+            "SXTS30":   { line: "병1", size: "40000(2)" },
+            "SXTS400":  { line: "병2", size: "3000(0.5)" },
+            "SLTS800":  { line: "병2", size: "3500(0.7)" },
+            "PANTS300": { line: "병2", size: "3333(0.5)" },
+            "SNTS30":   { line: "PTP", size: "33333EA" },
+            "PANTS3P":  { line: "PTP", size: "333333(3)" },
+            "XCPX14":   { line: "PTP", size: "14286EA" },
+            "XCPL14":   { line: "PTP", size: "14286EA" },
+            "XCP14":    { line: "PTP", size: "7143EA" },
+            "XCPH14":   { line: "PTP", size: "14286EA" },
+            "XCPF14":   { line: "PTP", size: "9524EA" },
+            "XCPS14":   { line: "PTP", size: "7143EA" }
+        };
+
+        function getPackUnitMultiplier(pName) {
+            if (!pName || pName === "정비") return 1;
+            const match = pName.match(/\d+/);
+            return match ? parseInt(match[0], 10) : 1;
+        }
+
+        let masterYearlyDB = {};
+        let currentActiveYear = "2026";
+        let systemDB = {};
+        let myChartInstance = null;
+
+        let activeLineSetup = { "병1": "", "병2": "", "PTP": "" };
+        let currentBatchInputValues = { "병1": "", "병2": "", "PTP": "" }; 
+        let currentQuantityInputValues = { "병1": 0, "병2": 0, "PTP": 0 };
+        let currentWorkerInputValues = { "병1": "", "병2": "", "PTP": "" };
+        let expandedProductCard = null; 
+        let expandedShipProductCard = null;
+
+        // 🌟 페이지 초기 가동 시 백엔드 DB에서 데이터 로드
+        window.onload = async function() {
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            const todayStr = `${year}-${month}-${day}`;
+
+            const dateInput = document.getElementById('target-date');
+            if(dateInput) dateInput.value = todayStr;
+
+            await loadMasterDBFromServer();
+            switchActiveYearDatabase(String(year));
+            updateAddWaitProductOptions();
+            renderAllSections();
+            applyLockStateUI();
+        };
+
+        // 🌟 백엔드 서버(Node.js API)로부터 DB 데이터 조회
+        async function loadMasterDBFromServer() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/db`);
+                if(response.ok) {
+                    masterYearlyDB = await response.json();
+                } else {
+                    console.warn("서버 DB 호출 실패, 기본 로컬 구조로 대체합니다.");
+                    masterYearlyDB = JSON.parse(localStorage.getItem('DONG_A_CORE_DB_V30')) || {};
+                }
+            } catch(e) {
+                console.error("백엔드 서버 연동 오류:", e);
+                masterYearlyDB = JSON.parse(localStorage.getItem('DONG_A_CORE_DB_V30')) || {};
+            }
+        }
+
+        // 🌟 백엔드 서버로 DB 데이터를 동기화하여 저장
+        async function saveToLocalStorage() {
+            localStorage.setItem('DONG_A_CORE_DB_V30', JSON.stringify(masterYearlyDB));
+            try {
+                await fetch(`${API_BASE_URL}/db`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(masterYearlyDB)
+                });
+            } catch(e) {
+                console.error("서버 자동 저장 실패:", e);
+            }
+        }
+
+        function createEmptyYearlyDB(yearStr) {
+            return {
+                isDashboardLocked: true,
+                dailyAttendance: {},
+                waitBatchList: {},
+                baseLots: {},
+                completedHistory: [],
+                shipWaitList: {},
+                shipCompletedHistory: [],
+                shipTargets: {},
+                yearlyLotGoal: 203
+            };
+        }
+
+        function switchActiveYearDatabase(targetYear) {
+            currentActiveYear = targetYear;
+            if(!masterYearlyDB[currentActiveYear]) {
+                masterYearlyDB[currentActiveYear] = createEmptyYearlyDB(currentActiveYear);
+            }
+            systemDB = masterYearlyDB[currentActiveYear];
+
+            const yearDisplay = document.getElementById('summary-active-year');
+            if(yearDisplay) yearDisplay.innerText = currentActiveYear;
+
+            saveToLocalStorage();
+        }
+
+        function changeYearlyDatabase() {
+            const userInput = prompt("🔄 전환할 기준 연도를 입력하세요 (예: 2026, 2027):", currentActiveYear);
+            if(userInput === null) return;
+
+            const yearVal = userInput.trim();
+            if(!/^\d{4}$/.test(yearVal)) {
+                alert("❌ 4자리 연도 숫자(예: 2026)를 입력해주세요.");
+                return;
+            }
+
+            const targetDateInput = document.getElementById('target-date');
+            if(targetDateInput) {
+                const curDate = targetDateInput.value;
+                const monthDay = curDate ? curDate.substring(5) : "01-01";
+                targetDateInput.value = `${yearVal}-${monthDay}`;
+            }
+
+            switchActiveYearDatabase(yearVal);
+            renderAllSections();
+            applyLockStateUI();
+
+            alert(`📅 [${yearVal}년] 데이터베이스로 전환되었습니다.`);
+        }
+
+        function exportSystemDB() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(masterYearlyDB, null, 2));
+            const downloadAnchor = document.createElement('a');
+            const targetDate = document.getElementById('target-date').value || "today";
+            
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `DONG_A_CORE_BACKUP_${targetDate}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+
+            alert("📥 대시보드 연도별 전체 백업 파일(JSON) 다운로드가 완료되었습니다!");
+        }
+
+        function triggerRestoreFileInput() {
+            if(systemDB.isDashboardLocked) {
+                alert("🔒 상단 [🔓 편집 잠금 해제] 버튼을 눌러 권한 승인 후 복원이 가능합니다.");
+                return;
+            }
+            document.getElementById('restore-file-input').click();
+        }
+
+        function handleRestoreFile(event) {
+            const file = event.target.files[0];
+            if(!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    const importedDB = JSON.parse(e.target.result);
+                    if(importedDB && typeof importedDB === 'object') {
+                        if(confirm("📤 선택하신 백업 파일 데이터로 대시보드를 전면 복원하시겠습니까?")) {
+                            masterYearlyDB = importedDB;
+                            systemDB = masterYearlyDB[currentActiveYear] || importedDB[Object.keys(importedDB)[0]];
+                            await saveToLocalStorage();
+                            renderAllSections();
+                            applyLockStateUI();
+                            alert("🎉 데이터 복원이 완벽하게 완료되었습니다!");
+                        }
+                    } else {
+                        alert("❌ 올바른 대시보드 백업 파일(JSON) 형식이 아닙니다.");
+                    }
+                } catch (err) {
+                    alert("❌ 백업 파일을 읽는 중 오류가 발생했습니다.");
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        function toggleDashboardLock() {
+            if (systemDB.isDashboardLocked) {
+                const passwordInput = prompt("🔒 대시보드 편집 권한을 승인합니다.\n설정된 4자리 비밀번호를 입력하세요:");
+                if (passwordInput === "2087") {
+                    systemDB.isDashboardLocked = false;
+                    alert("🔓 인증 성공! 대시보드 편집 권한이 정상 활성화되었습니다.");
+                } else if (passwordInput === null) {
+                    return;
+                } else {
+                    alert("❌ 비밀번호가 올바르지 않습니다. 보기 전용 모드가 유지됩니다.");
+                    return;
+                }
+            } else {
+                systemDB.isDashboardLocked = true;
+                alert("🔒 편집 권한이 잠겼으며 다시 보기 전용 모드로 안전하게 변경되었습니다.");
+            }
+
+            saveToLocalStorage();
+            applyLockStateUI();
+            renderAllSections();
+        }
+
+        function applyLockStateUI() {
+            const isLocked = systemDB.isDashboardLocked;
+            const badge = document.getElementById('lock-status-badge');
+            const btn = document.getElementById('btn-lock-toggle');
+            const alertMsgs = document.querySelectorAll('.lock-alert-msg');
+            const addWaitBtn = document.getElementById('btn-add-wait-lot');
+
+            if (isLocked) {
+                badge.innerText = "🔒 보기 전용 모드";
+                badge.className = "text-xs font-bold px-2 py-1 rounded bg-amber-100 text-amber-800 flex items-center gap-1";
+                btn.innerText = "🔓 편집 잠금 해제";
+                btn.className = "bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold px-3 py-1.5 rounded transition shadow-sm";
+                alertMsgs.forEach(m => m.classList.remove('hidden'));
+                if(addWaitBtn) {
+                    addWaitBtn.disabled = true;
+                    addWaitBtn.className = "w-full bg-gray-600 text-gray-300 font-bold py-2 px-4 rounded text-xs cursor-not-allowed flex items-center justify-center gap-1 opacity-60";
+                }
+            } else {
+                badge.innerText = "🔓 편집 가능 모드";
+                badge.className = "text-xs font-bold px-2 py-1 rounded bg-emerald-100 text-emerald-800 flex items-center gap-1";
+                btn.innerText = "🔒 편집 권한 잠금";
+                btn.className = "bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3 py-1.5 rounded transition shadow-sm";
+                alertMsgs.forEach(m => m.classList.add('hidden'));
+                if(addWaitBtn) {
+                    addWaitBtn.disabled = false;
+                    addWaitBtn.className = "w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded text-xs transition shadow flex items-center justify-center gap-1";
+                }
+            }
+
+            document.querySelectorAll('.lockable-input').forEach(input => {
+                input.disabled = isLocked;
+                if(isLocked) {
+                    input.classList.add('bg-gray-100', 'cursor-not-allowed', 'text-gray-400');
+                } else {
+                    input.classList.remove('bg-gray-100', 'cursor-not-allowed', 'text-gray-400');
+                }
+            });
+        }
+
+        function updateAddWaitProductOptions() {
+            const lineSelect = document.getElementById('add-wait-line-select');
+            const prodSelect = document.getElementById('add-wait-product-select');
+            if(!lineSelect || !prodSelect) return;
+
+            const selectedLine = lineSelect.value;
+            prodSelect.innerHTML = '';
+
+            Object.keys(productMaster).forEach(pName => {
+                if(productMaster[pName].line === selectedLine) {
+                    prodSelect.innerHTML += `<option value="${pName}">${pName} (${productMaster[pName].size})</option>`;
+                }
+            });
+        }
+
+        function addWaitLotItem() {
+            if(systemDB.isDashboardLocked) {
+                alert("🔒 상단 [🔓 편집 잠금 해제] 버튼을 눌러 권한 승인 후 이용 가능합니다.");
+                return;
+            }
+
+            const pName = document.getElementById('add-wait-product-select').value;
+            const batchNo = document.getElementById('add-wait-batch-input').value.trim();
+
+            if(!pName || !batchNo) {
+                alert("대기 목록에 추가할 제품과 제조번호(Batch No)를 모두 정확히 입력해주세요.");
+                return;
+            }
+
+            if(!systemDB.waitBatchList[pName]) systemDB.waitBatchList[pName] = [];
+            systemDB.waitBatchList[pName].push(batchNo);
+            
+            document.getElementById('add-wait-batch-input').value = '';
+
+            saveToLocalStorage();
+            renderAllSections();
+            
+            expandedProductCard = pName;
+            renderWaitTabList();
+
+            alert(`✅ [${pName}] 제품에 제조번호 (${batchNo})가 대기 목록에 성공적으로 추가되었습니다.`);
+        }
+
+        function deleteWaitBatchSingle(pName, batchIndex) {
+            if(systemDB.isDashboardLocked) return;
+            if(!confirm(`[${pName}] 의 제조번호 (${systemDB.waitBatchList[pName][batchIndex]}) 항목을 삭제하시겠습니까?`)) return;
+
+            systemDB.waitBatchList[pName].splice(batchIndex, 1);
+            saveToLocalStorage();
+            renderAllSections();
+        }
+
+        function toggleProductBatchList(pName) {
+            expandedProductCard = (expandedProductCard === pName) ? null : pName;
+            renderWaitTabList();
+        }
+
+        function toggleShipBatchList(pName) {
+            expandedShipProductCard = (expandedShipProductCard === pName) ? null : pName;
+            renderShipWaitTab();
+        }
+
+        function renderWaitTabList() {
+            const l1 = document.getElementById('wait-line-1');
+            const l2 = document.getElementById('wait-line-2');
+            const l3 = document.getElementById('wait-line-3');
+            if(!l1 || !l2 || !l3) return;
+
+            l1.innerHTML = ''; l2.innerHTML = ''; l3.innerHTML = '';
+            let line1Lots = 0, line2Lots = 0, line3Lots = 0;
+            const isLocked = systemDB.isDashboardLocked;
+
+            Object.keys(productMaster).forEach(pName => {
+                const info = productMaster[pName];
+                const batchArr = systemDB.waitBatchList[pName] || [];
+                const lotCount = batchArr.length;
+
+                if(info.line === "병1") line1Lots += lotCount;
+                if(info.line === "병2") line2Lots += lotCount;
+                if(info.line === "PTP") line3Lots += lotCount;
+
+                const isExpanded = (expandedProductCard === pName);
+                const hasLots = lotCount > 0;
+                
+                let batchItemsHtml = lotCount === 0 
+                    ? `<div class="text-[11px] text-gray-400 italic p-2 text-center bg-gray-50 rounded">대기 중인 제조번호가 없습니다.</div>`
+                    : batchArr.map((bNo, idx) => `
+                        <div class="flex items-center justify-between bg-slate-100 px-2.5 py-1.5 rounded text-xs font-mono border border-slate-200">
+                            <span class="font-bold text-slate-700">${bNo}</span>
+                            ${!isLocked ? `<button onclick="event.stopPropagation(); deleteWaitBatchSingle('${pName}', ${idx})" class="text-rose-500 hover:text-rose-700 text-[10px] font-bold px-1.5 py-0.5 rounded hover:bg-rose-100">삭제</button>` : ''}
+                        </div>
+                    `).join('');
+
+                const cardHtml = `
+                    <div class="border border-gray-200 rounded-lg overflow-hidden bg-white shadow-sm transition hover:border-blue-400">
+                        <div onclick="toggleProductBatchList('${pName}')" class="p-3 cursor-pointer flex items-center justify-between bg-white hover:bg-slate-50 transition">
+                            <div>
+                                <div class="font-bold text-slate-800 text-xs flex items-center gap-2">
+                                    <span>${pName}</span>
+                                    <span class="text-[10px] font-normal text-gray-400">규격: ${info.size}</span>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-black px-2 py-0.5 rounded-full ${hasLots ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-gray-100 text-gray-400'}">
+                                    ${lotCount} Lot
+                                </span>
+                                <span class="text-xs text-gray-400">${isExpanded ? '▲' : '▼'}</span>
+                            </div>
+                        </div>
+
+                        <div class="${isExpanded ? 'block' : 'hidden'} p-3 border-t border-gray-100 bg-slate-50 space-y-1.5">
+                            <div class="text-[11px] font-bold text-slate-500 mb-1 border-b pb-1 flex justify-between items-center">
+                                <span>📋 대기 제조번호(Batch) 목록</span>
+                            </div>
+                            ${batchItemsHtml}
+                        </div>
+                    </div>`;
+
+                if(info.line === "병1") l1.innerHTML += cardHtml;
+                if(info.line === "병2") l2.innerHTML += cardHtml;
+                if(info.line === "PTP") l3.innerHTML += cardHtml;
+            });
+
+            document.getElementById('line-1-count-badge').innerText = line1Lots + " Lot";
+            document.getElementById('line-2-count-badge').innerText = line2Lots + " Lot";
+            document.getElementById('line-3-count-badge').innerText = line3Lots + " Lot";
+        }
+
+        function renderAllSections() {
+            calculateAttendance();
+            renderMainLiveStatusTable();
+            renderControlPanel();
+            renderWaitTabList();
+            renderCompleteHistoryTable();
+            renderLotSummaryBox();
+            renderShipWaitTab();
+            renderShipCompleteTab();
+            renderDashboardYearlySummary();
+        }
+
+        function renderDashboardYearlySummary() {
+            let totalProdLots = 0;
+            Object.keys(productMaster).forEach(pName => {
+                totalProdLots += (systemDB.baseLots[pName] || 0);
+            });
+
+            const shipHistory = systemDB.shipCompletedHistory || [];
+            let totalShipLots = shipHistory.length;
+
+            const goal = systemDB.yearlyLotGoal || 203;
+
+            const prodPct = goal > 0 ? ((totalProdLots / goal) * 100).toFixed(2) : "0.00";
+            const shipPct = goal > 0 ? ((totalShipLots / goal) * 100).toFixed(2) : "0.00";
+
+            document.getElementById('dash-summary-prod-lots').innerText = totalProdLots + " Lot";
+            document.getElementById('dash-summary-prod-pct').innerText = prodPct + "%";
+            document.getElementById('dash-target-prod-goal').innerText = goal;
+
+            document.getElementById('dash-summary-ship-lots').innerText = totalShipLots + " Lot";
+            document.getElementById('dash-summary-ship-pct').innerText = shipPct + "%";
+            document.getElementById('dash-target-ship-goal').innerText = goal;
+        }
+
+        function editYearlyTargetGoal() {
+            if(systemDB.isDashboardLocked) return;
+            const currentGoal = systemDB.yearlyLotGoal || 203;
+            const userInput = prompt(`🎯 [${currentActiveYear}년] 연간 목표 로트수(Lot)를 입력하세요:`, currentGoal);
+            if(userInput === null) return;
+
+            const parsedVal = parseInt(userInput, 10);
+            if(isNaN(parsedVal) || parsedVal <= 0) return;
+
+            systemDB.yearlyLotGoal = parsedVal;
+            saveToLocalStorage();
+            renderDashboardYearlySummary();
+        }
+
+        function renderMainLiveStatusTable() {
+            const tbody = document.getElementById('dash-live-status-body');
+            if(!tbody) return;
+            tbody.innerHTML = '';
+
+            Object.keys(productMaster).forEach(pName => {
+                const info = productMaster[pName];
+                const waitLots = systemDB.waitBatchList[pName] ? systemDB.waitBatchList[pName].length : 0;
+                let totalCompletedLot = systemDB.baseLots[pName] || 0;
+                
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50 transition border-b border-gray-100">
+                        <td class="p-2.5 font-bold text-slate-800 text-xs">${pName}</td>
+                        <td class="p-2.5 text-gray-500 font-mono text-[11px]">${info.size}</td>
+                        <td class="p-2.5 font-bold ${info.line==='병1'?'text-blue-600 bg-blue-50/20':''}" id="dash-wait-b1-${pName}">${info.line === '병1' ? waitLots + ' Lot' : '-'}</td>
+                        <td class="p-2.5 font-bold ${info.line==='병2'?'text-indigo-600 bg-indigo-50/20':''}" id="dash-wait-b2-${pName}">${info.line === '병2' ? waitLots + ' Lot' : '-'}</td>
+                        <td class="p-2.5 font-bold ${info.line==='PTP'?'text-amber-600 bg-amber-50/20':''}" id="dash-wait-ptp-${pName}">${info.line === 'PTP' ? waitLots + ' Lot' : '-'}</td>
+                        <td class="p-2.5 font-extrabold text-emerald-600 bg-emerald-50/30 text-xs">${totalCompletedLot} Lot</td>
+                    </tr>`;
+            });
+        }
+
+        function renderControlPanel() {
+            const tbody = document.getElementById('dash-control-panel-body');
+            if(!tbody) return;
+            tbody.innerHTML = '';
+            const lines = ["병1", "병2", "PTP"];
+            const isLocked = systemDB.isDashboardLocked;
+            
+            lines.forEach(lineIdx => {
+                let selectedProduct = activeLineSetup[lineIdx];
+                let currentBatch = currentBatchInputValues[lineIdx] || "";
+                let currentQty = currentQuantityInputValues[lineIdx] || 0;
+                let currentWorker = currentWorkerInputValues[lineIdx] || "";
+                
+                const isMaintenance = (selectedProduct === "정비");
+                const disabledAttr = isLocked ? 'disabled' : '';
+                const fieldDisabledAttr = (isLocked || isMaintenance) ? 'disabled' : '';
+
+                const inputBg = (isLocked || isMaintenance) ? 'bg-gray-100 cursor-not-allowed text-gray-400' : 'bg-white';
+                const workerInputBg = isLocked ? 'bg-gray-100 cursor-not-allowed text-gray-400' : 'bg-white';
+                const btnStyle = isLocked ? 'bg-gray-400 cursor-not-allowed opacity-60' : 'bg-emerald-600 hover:bg-emerald-700';
+
+                let optionHtml = `<option value="">-- 제품 선택 --</option>`;
+                const isMaintSel = (selectedProduct === "정비") ? 'selected' : '';
+                optionHtml += `<option value="정비" class="font-bold text-amber-600" ${isMaintSel}>🔧 [정비 작업]</option>`;
+
+                Object.keys(productMaster).forEach(pName => {
+                    if(productMaster[pName].line === lineIdx) {
+                        const isSel = (pName === selectedProduct) ? 'selected' : '';
+                        const waitCount = systemDB.waitBatchList[pName] ? systemDB.waitBatchList[pName].length : 0;
+                        optionHtml += `<option value="${pName}" ${isSel}>${pName} [대기: ${waitCount}Lot]</option>`;
+                    }
+                });
+
+                tbody.innerHTML += `
+                    <tr class="bg-white border-b border-gray-200">
+                        <td class="p-3 font-bold text-slate-700 text-xs">${lineIdx} 라인</td>
+                        <td class="p-2">
+                            <select id="product-select-${lineIdx}" ${disabledAttr} onchange="handleProductSelectChange('${lineIdx}')" class="${inputBg} w-full text-xs border border-gray-300 rounded p-1.5 font-bold ${isMaintenance ? 'text-amber-600' : 'text-blue-600'}">
+                                ${optionHtml}
+                            </select>
+                        </td>
+                        <td class="p-2">
+                            <input type="text" id="batch-input-${lineIdx}" value="${isMaintenance ? '-' : currentBatch}" ${fieldDisabledAttr} onchange="saveCacheInput('${lineIdx}', 'batch')" placeholder="${isMaintenance ? '정비 모드' : 'Batch No 입력'}" class="${inputBg} w-full text-xs border border-gray-300 rounded p-1.5 font-mono">
+                        </td>
+                        <td class="p-2">
+                            <div class="flex items-center gap-1">
+                                <input type="number" id="qty-input-${lineIdx}" value="${isMaintenance ? 0 : currentQty}" ${fieldDisabledAttr} onchange="saveCacheInput('${lineIdx}', 'qty')" placeholder="0" class="${inputBg} w-24 text-right text-xs border border-gray-300 rounded p-1.5 font-mono">
+                                <span class="text-xs text-gray-500 font-bold shrink-0">EA</span>
+                            </div>
+                        </td>
+                        <td class="p-2">
+                            <input type="text" id="worker-input-${lineIdx}" value="${currentWorker}" ${disabledAttr} onchange="saveCacheInput('${lineIdx}', 'worker')" placeholder="작업자 이름" class="${workerInputBg} w-full text-xs border border-gray-300 rounded p-1.5 font-bold text-slate-700">
+                        </td>
+                        <td class="p-3 text-center">
+                            <button onclick="triggerCompleteAction('${lineIdx}')" ${disabledAttr} class="${btnStyle} text-white font-bold px-3 py-1.5 rounded text-xs shadow-sm transition">
+                                ✔ 생산 완료
+                            </button>
+                        </td>
+                    </tr>`;
+            });
+        }
+
+        function handleProductSelectChange(lineIdx) {
+            const el = document.getElementById(`product-select-${lineIdx}`);
+            if(!el) return;
+            const pName = el.value;
+            activeLineSetup[lineIdx] = pName;
+
+            if(pName === "정비") {
+                currentBatchInputValues[lineIdx] = "-";
+                currentQuantityInputValues[lineIdx] = 0;
+            } else if(pName && systemDB.waitBatchList[pName] && systemDB.waitBatchList[pName].length > 0) {
+                const autoRecommendedBatch = systemDB.waitBatchList[pName][0];
+                currentBatchInputValues[lineIdx] = autoRecommendedBatch;
+            }
+
+            const targetDate = document.getElementById('target-date').value;
+            if(systemDB.dailyAttendance[targetDate] && systemDB.dailyAttendance[targetDate].manager) {
+                const defaultManager = systemDB.dailyAttendance[targetDate].manager.split(',')[0].trim();
+                if(defaultManager) {
+                    currentWorkerInputValues[lineIdx] = defaultManager;
+                }
+            }
+
+            renderControlPanel();
+        }
+
+        function saveCacheInput(lineIdx, type) {
+            if(systemDB.isDashboardLocked) return;
+            if(type === 'batch') {
+                const el = document.getElementById(`batch-input-${lineIdx}`);
+                if(el) currentBatchInputValues[lineIdx] = el.value;
+            } else if(type === 'qty') {
+                const el = document.getElementById(`qty-input-${lineIdx}`);
+                if(el) currentQuantityInputValues[lineIdx] = parseInt(el.value) || 0;
+            } else if(type === 'worker') {
+                const el = document.getElementById(`worker-input-${lineIdx}`);
+                if(el) currentWorkerInputValues[lineIdx] = el.value;
+            }
+        }
+
+        function triggerCompleteAction(lineIdx) {
+            if(systemDB.isDashboardLocked) return;
+
+            const pName = document.getElementById(`product-select-${lineIdx}`).value;
+            const workerName = document.getElementById(`worker-input-${lineIdx}`).value.trim() || "담당자 미지정";
+            const targetDate = document.getElementById('target-date').value;
+
+            if(!pName) {
+                alert("현재 생산 진행 제품(또는 정비)을 선택해주세요.");
+                return;
+            }
+
+            const now = new Date();
+            const uniqueId = "ID_" + now.getTime();
+            const timeStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+
+            if(pName === "정비") {
+                if(!confirm(`[${lineIdx} 라인 - 정비 작업]\n작업자: ${workerName}\n정비 완료 내용을 기록하시겠습니까? (수량 미영향)`)) return;
+
+                systemDB.completedHistory.unshift({
+                    id: uniqueId, workDate: targetDate, time: timeStr, name: "정비", batchNo: "-", countEA: 0, worker: workerName, lotCount: 0, isMaintenance: true
+                });
+
+                activeLineSetup[lineIdx] = "";
+                currentBatchInputValues[lineIdx] = "";
+                currentQuantityInputValues[lineIdx] = 0;
+                currentWorkerInputValues[lineIdx] = "";
+
+                saveToLocalStorage();
+                renderAllSections();
+
+                alert(`🔧 [${lineIdx} 라인 정비] 완료 기록이 성공적으로 추가되었습니다.`);
+                return;
+            }
+
+            const batchNo = document.getElementById(`batch-input-${lineIdx}`).value.trim();
+            const qtyEA = parseInt(document.getElementById(`qty-input-${lineIdx}`).value) || 0;
+
+            if(!batchNo || qtyEA <= 0) {
+                alert("Batch No 기입 및 생산 수량(EA) 입력을 모두 완료해 주세요.");
+                return;
+            }
+
+            const waitList = systemDB.waitBatchList[pName] || [];
+            const matchedIdx = waitList.indexOf(batchNo);
+
+            if(matchedIdx === -1) {
+                alert(`❌ [오류] 현재 입력하신 제조번호 (${batchNo})는 반제품 대기 목록에 존재하지 않습니다.\n\n정확한 제조번호를 확인하신 후 다시 입력해주세요.`);
+                return;
+            }
+
+            if(!confirm(`[${lineIdx} 라인 - ${pName}]\nBatch: ${batchNo}\n수량: ${qtyEA.toLocaleString()} EA\n작업자: ${workerName}\n생산을 완료 처리합니까?`)) return;
+
+            systemDB.completedHistory.unshift({
+                id: uniqueId, workDate: targetDate, time: timeStr, name: pName, batchNo: batchNo, countEA: qtyEA, worker: workerName, lotCount: 1, isMaintenance: false
+            });
+
+            if(!systemDB.baseLots[pName]) systemDB.baseLots[pName] = 0;
+            systemDB.baseLots[pName] += 1;
+
+            systemDB.waitBatchList[pName].splice(matchedIdx, 1);
+
+            if(!systemDB.shipWaitList[pName]) systemDB.shipWaitList[pName] = [];
+            systemDB.shipWaitList[pName].push({
+                batchNo: batchNo,
+                qtyEA: qtyEA
+            });
+
+            activeLineSetup[lineIdx] = "";
+            currentBatchInputValues[lineIdx] = "";
+            currentQuantityInputValues[lineIdx] = 0;
+            currentWorkerInputValues[lineIdx] = "";
+
+            saveToLocalStorage();
+            renderAllSections();
+            
+            alert(`🎉 [${pName} - ${batchNo}] 생산 완료 등록되었습니다! (반제품 대기에서 차감 완료)`);
+        }
+
+        function deleteCompletedHistoryItem(itemId) {
+            if(systemDB.isDashboardLocked) return;
+
+            const foundIndex = systemDB.completedHistory.findIndex(item => item.id === itemId);
+            if(foundIndex === -1) return;
+
+            const targetItem = systemDB.completedHistory[foundIndex];
+            
+            if(targetItem.isMaintenance) {
+                if(!confirm(`[정비 기록] (작업자: ${targetItem.worker}) 내역을 삭제하시겠습니까?`)) return;
+                systemDB.completedHistory.splice(foundIndex, 1);
+                saveToLocalStorage();
+                renderAllSections();
+                alert(`🗑️ 정비 기록이 삭제되었습니다.`);
+                return;
+            }
+
+            if(!confirm(`[${targetItem.name}] (Batch: ${targetItem.batchNo}) 완료 데이터를 취소/삭제하시겠습니까?\n⚠️ 연결된 [출하 대기 제품] 항목도 자동 함께 삭제됩니다.`)) return;
+
+            const pName = targetItem.name;
+            const targetBatch = targetItem.batchNo;
+
+            if(systemDB.baseLots[pName]) systemDB.baseLots[pName] = Math.max(0, systemDB.baseLots[pName] - 1);
+            
+            if(!systemDB.waitBatchList[pName]) systemDB.waitBatchList[pName] = [];
+            systemDB.waitBatchList[pName].unshift(targetBatch);
+
+            if(systemDB.shipWaitList[pName] && systemDB.shipWaitList[pName].length > 0) {
+                const shipWaitIdx = systemDB.shipWaitList[pName].findIndex(sw => sw.batchNo === targetBatch);
+                if(shipWaitIdx !== -1) {
+                    systemDB.shipWaitList[pName].splice(shipWaitIdx, 1);
+                }
+            }
+
+            systemDB.completedHistory.splice(foundIndex, 1);
+
+            saveToLocalStorage();
+            renderAllSections();
+
+            alert(`🗑️ [${pName} - ${targetBatch}] 생산 완료 및 연결된 출하 대기 항목이 취소 삭제되었습니다.`);
+        }
+
+        function renderCompleteHistoryTable() {
+            const tbody = document.getElementById('prod-complete-history-body');
+            const placeholder = document.getElementById('history-empty-placeholder');
+            const dateBadge = document.getElementById('history-date-badge');
+            if(!tbody) return; 
+            
+            const targetDate = document.getElementById('target-date').value;
+            if(dateBadge) dateBadge.innerText = `조회일: ${targetDate}`;
+            tbody.innerHTML = '';
+
+            const filteredHistory = systemDB.completedHistory.filter(item => item.workDate === targetDate);
+
+            if(filteredHistory.length === 0) {
+                if(placeholder) placeholder.classList.remove('hidden');
+            } else {
+                if(placeholder) placeholder.classList.add('hidden');
+                filteredHistory.forEach(item => {
+                    const displayEA = item.isMaintenance ? "-" : (item.countEA ? item.countEA.toLocaleString() + " EA" : "-");
+                    const workerDisplay = item.worker ? item.worker : "미지정";
+                    const delBtnHtml = systemDB.isDashboardLocked
+                        ? `<button disabled class="bg-gray-200 text-gray-400 text-[10px] px-2 py-1 rounded cursor-not-allowed ml-2">🗑️ 삭제</button>`
+                        : `<button onclick="deleteCompletedHistoryItem('${item.id}')" class="bg-red-50 text-red-600 hover:bg-red-600 hover:text-white font-bold text-[10px] px-2 py-1 rounded transition ml-2 shadow-sm">🗑️ 삭제</button> `;
+
+                    const statusBadge = item.isMaintenance 
+                        ? `<span class="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-300">🔧 설비 정비 완료</span>`
+                        : `<span class="bg-green-100 text-green-800 text-[10px] font-bold px-2 py-0.5 rounded-full">포장 라인 완료</span>`;
+
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-gray-50 text-xs border-b border-gray-100">
+                            <td class="p-2.5 font-mono text-gray-500">${item.time}</td>
+                            <td class="p-2.5 font-bold ${item.isMaintenance ? 'text-amber-700' : 'text-slate-800'}">${item.name}</td>
+                            <td class="p-2.5 font-mono font-bold ${item.isMaintenance ? 'text-gray-400' : 'text-blue-600'}">${item.batchNo}</td>
+                            <td class="p-2.5 font-mono text-right font-bold text-slate-700 bg-gray-50/50">${displayEA}</td>
+                            <td class="p-2.5 font-bold text-slate-700 bg-blue-50/30">${workerDisplay}</td>
+                            <td class="p-2.5 font-black text-center ${item.isMaintenance ? 'text-gray-400' : 'text-emerald-600 bg-emerald-50/10'}">${item.isMaintenance ? '-' : '+' + item.lotCount + ' Lot'}</td>
+                            <td class="p-2.5 flex items-center justify-between">
+                                ${statusBadge}
+                                ${delBtnHtml}
+                            </td>
+                        </tr>`;
+                });
+            }
+        }
+
+        function editCompletedLotQuantity(pName) {
+            if(systemDB.isDashboardLocked) return;
+            const currentVal = systemDB.baseLots[pName] || 0;
+            const userInput = prompt(`[${pName}] 누적 생산 로트수 정정\n변경할 수량을 입력하세요:`, currentVal);
+            if(userInput === null) return; 
+
+            const parsedVal = parseInt(userInput);
+            if(isNaN(parsedVal) || parsedVal < 0) return;
+
+            systemDB.baseLots[pName] = parsedVal;
+            saveToLocalStorage();
+            renderAllSections();
+        }
+
+        function renderLotSummaryBox() {
+            const box = document.getElementById('total-lot-summary-box');
+            if(!box) return;
+            box.innerHTML = '';
+            let grandTotal = 0;
+            const isLocked = systemDB.isDashboardLocked;
+
+            Object.keys(productMaster).forEach(pName => {
+                let currentTotalLots = systemDB.baseLots[pName] || 0;
+                grandTotal += currentTotalLots;
+                const btnClass = isLocked 
+                    ? "bg-gray-200 text-gray-400 cursor-not-allowed text-[10px] px-2 py-1 rounded font-medium shrink-0" 
+                    : "bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white text-[10px] px-2 py-1 rounded font-bold transition shrink-0";
+
+                box.innerHTML += `
+                    <div class="bg-white border border-gray-200 p-2.5 rounded-lg shadow-sm flex items-center justify-between gap-2">
+                        <div>
+                            <div class="text-[10px] font-bold text-gray-400">${pName}</div>
+                            <div class="text-sm font-black text-slate-800 mt-0.5">${currentTotalLots} <span class="text-xs font-normal text-gray-500">Lot</span></div>
+                        </div>
+                        <button onclick="editCompletedLotQuantity('${pName}')" class="${btnClass}">✏️ 수정</button>
+                    </div>`;
+            });
+
+            const grandTotalEl = document.getElementById('grand-total-lots');
+            if(grandTotalEl) grandTotalEl.innerText = grandTotal + " 로트";
+        }
+
+        function renderShipWaitTab() {
+            const container = document.getElementById('ship-wait-container');
+            const emptyMsg = document.getElementById('ship-wait-empty');
+            if(!container) return;
+
+            container.innerHTML = '';
+            let totalShipWaitCardCount = 0;
+            const isLocked = systemDB.isDashboardLocked;
+
+            Object.keys(systemDB.shipWaitList || {}).forEach(pName => {
+                const list = systemDB.shipWaitList[pName] || [];
+                if(list.length === 0) return;
+
+                totalShipWaitCardCount++;
+                const lotCount = list.length;
+                const totalQty = list.reduce((acc, curr) => acc + (curr.qtyEA || 0), 0);
+                const isExpanded = (expandedShipProductCard === pName);
+
+                let batchItemsHtml = list.map((item, idx) => `
+                    <div class="flex items-center justify-between bg-white px-3 py-2 rounded border border-gray-200 shadow-sm">
+                        <div>
+                            <span class="font-mono font-bold text-slate-800 text-xs">${item.batchNo}</span>
+                            <span class="text-[10px] font-bold text-blue-600 ml-2">(${item.qtyEA ? item.qtyEA.toLocaleString() : 0} EA)</span>
+                        </div>
+                        ${!isLocked 
+                            ? `<button onclick="approveShipment('${pName}', ${idx})" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] px-2.5 py-1 rounded transition shadow-sm">🚚 출하 승인</button>` 
+                            : `<span class="text-[10px] text-amber-600 font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-200">검사 대기 중</span>`
+                        }
+                    </div>
+                `).join('');
+
+                container.innerHTML += `
+                    <div class="border border-slate-200 rounded-xl overflow-hidden bg-slate-50 shadow-sm hover:border-blue-400 transition">
+                        <div onclick="toggleShipBatchList('${pName}')" class="p-4 bg-white cursor-pointer flex items-center justify-between border-b border-gray-100">
+                            <div>
+                                <div class="font-bold text-slate-900 text-sm">${pName}</div>
+                                <div class="text-xs text-gray-500 mt-0.5">총 출하 대기 수량: <span class="font-extrabold text-blue-600">${totalQty.toLocaleString()} EA</span></div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="bg-blue-100 text-blue-800 font-extrabold text-xs px-2.5 py-1 rounded-full border border-blue-200">
+                                    ${lotCount} Lot 대기
+                                </span>
+                                <span class="text-xs text-gray-400">${isExpanded ? '▲' : '▼'}</span>
+                            </div>
+                        </div>
+                        <div class="${isExpanded ? 'block' : 'hidden'} p-3 space-y-2 bg-slate-100">
+                            <div class="text-[11px] font-bold text-slate-600 mb-1 flex justify-between items-center px-1">
+                                <span>📋 대기 제조번호 및 수량 목록</span>
+                                ${!isLocked && list.length > 1 
+                                    ? `<button onclick="approveShipmentAll('${pName}')" class="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-2 py-0.5 rounded font-bold transition">전체 일괄 출하</button>` 
+                                    : ''
+                                }
+                            </div>
+                            ${batchItemsHtml}
+                        </div>
+                    </div>`;
+            });
+
+            if(totalShipWaitCardCount === 0) {
+                emptyMsg.classList.remove('hidden');
+            } else {
+                emptyMsg.classList.add('hidden');
+            }
+        }
+
+        function approveShipment(pName, index) {
+            if(systemDB.isDashboardLocked) return;
+
+            const item = systemDB.shipWaitList[pName][index];
+            if(!confirm(`[${pName}] (Batch: ${item.batchNo} / ${item.qtyEA.toLocaleString()} EA) 제품을 최종 출하 승인 처리하시겠습니까?`)) return;
+
+            const targetDate = document.getElementById('target-date').value;
+            const packUnit = getPackUnitMultiplier(pName);
+
+            if(!systemDB.shipCompletedHistory) systemDB.shipCompletedHistory = [];
+            systemDB.shipCompletedHistory.unshift({
+                shipDate: targetDate,
+                pName: pName,
+                batchNo: item.batchNo,
+                qtyEA: item.qtyEA,
+                qtyUnit: item.qtyEA * packUnit
+            });
+
+            systemDB.shipWaitList[pName].splice(index, 1);
+
+            saveToLocalStorage();
+            renderAllSections();
+            alert(`🚚 [${pName} - ${item.batchNo}] 출하 승인이 완료되었습니다.`);
+        }
+
+        function approveShipmentAll(pName) {
+            if(systemDB.isDashboardLocked) return;
+            if(!confirm(`[${pName}] 의 모든 대기 로트를 일괄 출하 처리하시겠습니까?`)) return;
+
+            const list = systemDB.shipWaitList[pName] || [];
+            const targetDate = document.getElementById('target-date').value;
+            const packUnit = getPackUnitMultiplier(pName);
+
+            list.forEach(item => {
+                systemDB.shipCompletedHistory.unshift({
+                    shipDate: targetDate,
+                    pName: pName,
+                    batchNo: item.batchNo,
+                    qtyEA: item.qtyEA,
+                    qtyUnit: item.qtyEA * packUnit
+                });
+            });
+
+            systemDB.shipWaitList[pName] = [];
+
+            saveToLocalStorage();
+            renderAllSections();
+            alert(`🚚 [${pName}] 전 로트 일괄 출하 처리가 완료되었습니다.`);
+        }
+
+        function editShipTarget(pName) {
+            if(systemDB.isDashboardLocked) return;
+
+            if(!systemDB.shipTargets) systemDB.shipTargets = {};
+            const currentTarget = systemDB.shipTargets[pName] || 0;
+
+            const userInput = prompt(`[${pName}] 출하 목표 수량(EA 기준)을 설정하세요:`, currentTarget);
+            if(userInput === null) return;
+
+            const parsedVal = parseInt(userInput, 10);
+            if(isNaN(parsedVal) || parsedVal < 0) return;
+
+            systemDB.shipTargets[pName] = parsedVal;
+            saveToLocalStorage();
+            renderShipCompleteTab();
+        }
+
+        function renderShipCompleteTab() {
+            const tbody = document.getElementById('ship-complete-history-body');
+            const emptyMsg = document.getElementById('ship-complete-empty');
+            const summaryBox = document.getElementById('ship-complete-summary-box');
+            if(!tbody || !summaryBox) return;
+
+            tbody.innerHTML = '';
+            summaryBox.innerHTML = '';
+
+            const rawHistory = systemDB.shipCompletedHistory || [];
+            const isLocked = systemDB.isDashboardLocked;
+
+            const sortOrder = document.getElementById('ship-sort-select') ? document.getElementById('ship-sort-select').value : 'asc';
+            const history = [...rawHistory].sort((a, b) => {
+                if (sortOrder === 'asc') return a.shipDate.localeCompare(b.shipDate);
+                return b.shipDate.localeCompare(a.shipDate);
+            });
+
+            let grandTotalEA = 0;
+            let grandTotalUnit = 0;
+            let grandTotalLots = history.length;
+
+            if(history.length === 0) {
+                emptyMsg.classList.remove('hidden');
+            } else {
+                emptyMsg.classList.add('hidden');
+                history.forEach(item => {
+                    const packUnit = getPackUnitMultiplier(item.pName);
+                    const totalUnits = item.qtyUnit ? item.qtyUnit : ((item.qtyEA || 0) * packUnit);
+
+                    grandTotalEA += (item.qtyEA || 0);
+                    grandTotalUnit += totalUnits;
+
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-gray-50 text-xs border-b border-gray-100">
+                            <td class="p-2.5 font-mono text-gray-600 font-bold">${item.shipDate}</td>
+                            <td class="p-2.5 font-bold text-slate-800">${item.pName}</td>
+                            <td class="p-2.5 font-mono font-bold text-blue-600">${item.batchNo}</td>
+                            <td class="p-2.5 font-mono text-right font-bold text-emerald-700 bg-emerald-50/20">${item.qtyEA ? item.qtyEA.toLocaleString() : 0} EA</td>
+                            <td class="p-2.5 font-mono text-right font-black text-indigo-700 bg-indigo-50/20">${totalUnits.toLocaleString()} Unit</td>
+                            <td class="p-2.5 text-center">
+                                <span class="bg-blue-100 text-blue-800 text-[10px] font-bold px-2.5 py-0.5 rounded-full">🚚 출하 완료</span>
+                            </td>
+                        </tr>`;
+                });
+            }
+
+            document.getElementById('ship-grand-total-ea').innerText = grandTotalEA.toLocaleString() + " EA";
+            document.getElementById('ship-grand-total-unit').innerText = grandTotalUnit.toLocaleString() + " Unit";
+            document.getElementById('ship-grand-total-lots').innerText = grandTotalLots.toLocaleString() + " Lot";
+
+            const monthlyUnits = new Array(12).fill(0);
+            rawHistory.forEach(item => {
+                if(item.shipDate && item.shipDate.length >= 7) {
+                    const m = parseInt(item.shipDate.substring(5, 7), 10);
+                    if(m >= 1 && m <= 12) {
+                        const packUnit = getPackUnitMultiplier(item.pName);
+                        const unit = item.qtyUnit ? item.qtyUnit : ((item.qtyEA || 0) * packUnit);
+                        monthlyUnits[m - 1] += unit;
+                    }
+                }
+            });
+
+            document.getElementById('monthly-table-year-header').innerText = `${currentActiveYear}년`;
+            const cumUnits = new Array(12).fill(0);
+            let runningTotal = 0;
+
+            for(let i=0; i<12; i++) {
+                runningTotal += monthlyUnits[i];
+                cumUnits[i] = runningTotal;
+
+                const valEl = document.getElementById(`m-val-${i+1}`);
+                const cumEl = document.getElementById(`m-cum-${i+1}`);
+
+                if(valEl) valEl.innerText = monthlyUnits[i] > 0 ? monthlyUnits[i].toLocaleString() : "-";
+                if(cumEl) cumEl.innerText = cumUnits[i] > 0 ? cumUnits[i].toLocaleString() : "-";
+            }
+
+            renderMonthlyChart(monthlyUnits, cumUnits);
+
+            const stats = {};
+            Object.keys(productMaster).forEach(pName => { stats[pName] = { lots: 0, qtyEA: 0, qtyUnit: 0 }; });
+
+            rawHistory.forEach(item => {
+                if(!stats[item.pName]) stats[item.pName] = { lots: 0, qtyEA: 0, qtyUnit: 0 };
+                const packUnit = getPackUnitMultiplier(item.pName);
+                const ea = item.qtyEA || 0;
+                const unit = item.qtyUnit ? item.qtyUnit : (ea * packUnit);
+                
+                stats[item.pName].lots += 1;
+                stats[item.pName].qtyEA += ea;
+                stats[item.pName].qtyUnit += unit;
+            });
+
+            if(!systemDB.shipTargets) systemDB.shipTargets = {};
+
+            Object.keys(productMaster).forEach(pName => {
+                const st = stats[pName];
+                const targetEA = systemDB.shipTargets[pName] || 0;
+                const progressPct = targetEA > 0 ? Math.min(100, Math.round((st.qtyEA / targetEA) * 100)) : 0;
+                const realPct = targetEA > 0 ? ((st.qtyEA / targetEA) * 100).toFixed(1) : 0;
+
+                const editBtnHtml = isLocked 
+                    ? `<button disabled class="text-[10px] text-gray-300 cursor-not-allowed">✏️</button>` 
+                    : `<button onclick="editShipTarget('${pName}')" class="text-[10px] text-blue-600 font-bold hover:underline">✏️ 목표 설정</button>`;
+
+                summaryBox.innerHTML += `
+                    <div class="bg-white border border-gray-200 p-3 rounded-lg shadow-sm flex flex-col justify-between">
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-xs font-bold text-slate-800">${pName}</span>
+                                ${editBtnHtml}
+                            </div>
+                            
+                            <div class="mt-2 mb-2">
+                                <div class="flex justify-between items-baseline text-[10px] mb-1">
+                                    <span class="text-gray-500">목표 달성률:</span>
+                                    <span class="font-extrabold text-blue-600">${realPct}% ${realPct >= 100 ? '🎉' : ''}</span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                                    <div class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: ${progressPct}%"></div>
+                                </div>
+                            </div>
+
+                            <div class="text-[11px] text-gray-500 flex justify-between mt-2">
+                                <span>출하/목표(EA):</span>
+                                <span class="font-bold text-slate-700 font-mono">${st.qtyEA.toLocaleString()} / ${targetEA.toLocaleString()}</span>
+                            </div>
+                            <div class="text-[11px] text-indigo-700 font-bold flex justify-between mt-0.5 border-t border-dashed pt-1">
+                                <span>총 정제수(Unit):</span>
+                                <span class="font-extrabold font-mono">${st.qtyUnit.toLocaleString()} Unit</span>
+                            </div>
+                        </div>
+                    </div>`;
+            });
+        }
+
+        function renderMonthlyChart(monthlyUnits, cumUnits) {
+            const ctx = document.getElementById('monthlyUnitChart');
+            if(!ctx) return;
+
+            if(myChartInstance) {
+                myChartInstance.destroy();
+            }
+
+            myChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'],
+                    datasets: [
+                        {
+                            label: '월별 생산 Unit수',
+                            data: monthlyUnits,
+                            borderColor: '#2563eb',
+                            backgroundColor: '#2563eb',
+                            borderWidth: 2.5,
+                            tension: 0.1,
+                            pointRadius: 4,
+                            pointHoverRadius: 6
+                        },
+                        {
+                            label: '누적',
+                            data: cumUnits,
+                            borderColor: '#f97316',
+                            backgroundColor: '#f97316',
+                            borderWidth: 3,
+                            tension: 0.1,
+                            pointRadius: 4,
+                            pointHoverRadius: 6
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                font: { size: 11, weight: 'bold' },
+                                padding: 15
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': ' + context.parsed.y.toLocaleString() + ' Unit';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return (value / 1000000).toLocaleString() + 'M';
+                                },
+                                font: { size: 10 }
+                            },
+                            grid: { color: '#f1f5f9' }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { font: { size: 11, weight: 'bold' } }
+                        }
+                    }
+                }
+            });
+        }
+
+        function handleAttendanceInput() {
+            if(systemDB.isDashboardLocked) return;
+            const targetDate = document.getElementById('target-date').value;
+            if(!systemDB.dailyAttendance[targetDate]) systemDB.dailyAttendance[targetDate] = {};
+            
+            const att = systemDB.dailyAttendance[targetDate];
+            att.manager = document.getElementById('input-manager').value;
+            att.material = document.getElementById('input-material').value;
+            att.leave = document.getElementById('input-leave').value;
+            att.support = document.getElementById('input-support').value;
+            att.suspend = document.getElementById('input-suspend').value;
+            att.education = document.getElementById('input-education').value;
+            att.trip = document.getElementById('input-trip').value;
+            att.sick = document.getElementById('input-sick').value;
+            
+            saveToLocalStorage();
+            calculateAttendance();
+        }
+
+        function calculateAttendance() {
+            const targetDate = document.getElementById('target-date').value;
+            if(!document.getElementById('input-manager')) return; 
+
+            if(!systemDB.dailyAttendance[targetDate]) {
+                systemDB.dailyAttendance[targetDate] = { manager: "장원용", material: "유주연", leave: "", support: "", suspend: "", education: "", trip: "", sick: "" };
+            }
+            const att = systemDB.dailyAttendance[targetDate];
+            
+            document.getElementById('input-manager').value = att.manager || "";
+            document.getElementById('input-material').value = att.material || "";
+            document.getElementById('input-leave').value = att.leave || "";
+            document.getElementById('input-support').value = att.support || "";
+            document.getElementById('input-suspend').value = att.suspend || "";
+            document.getElementById('input-education').value = att.education || "";
+            document.getElementById('input-trip').value = att.trip || "";
+            document.getElementById('input-sick').value = att.sick || "";
+
+            function parseNames(text) {
+                if (!text) return [];
+                return text.split(',').map(n => n.trim()).filter(n => n !== "");
+            }
+
+            let maleCount = 5; let femaleCount = 6;
+            const excludes = [...parseNames(att.leave), ...parseNames(att.support), ...parseNames(att.suspend), ...parseNames(att.education), ...parseNames(att.trip), ...parseNames(att.sick)];
+
+            excludes.forEach(name => {
+                if (teamMembers[name]) {
+                    if (teamMembers[name].gender === "남") maleCount--;
+                    if (teamMembers[name].gender === "여") femaleCount--;
+                }
+            });
+
+            maleCount = Math.max(0, maleCount); femaleCount = Math.max(0, femaleCount);
+            document.getElementById('calc-male').innerText = maleCount + "명";
+            document.getElementById('calc-female').innerText = femaleCount + "명";
+            document.getElementById('calc-total').innerText = (maleCount + femaleCount) + "명";
+        }
+
+        function loadDateData() {
+            const dateInput = document.getElementById('target-date');
+            if(!dateInput) return;
+            const selectedDate = dateInput.value;
+            const displayEl = document.getElementById('dashboard-date-display');
+            if(displayEl) displayEl.innerText = selectedDate;
+
+            if(selectedDate && selectedDate.length >= 4) {
+                const targetYear = selectedDate.substring(0, 4);
+                if(targetYear !== currentActiveYear) {
+                    switchActiveYearDatabase(targetYear);
+                }
+            }
+
+            renderAllSections();
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            const tabEl = document.getElementById(`tab-${tabId}`);
+            if(tabEl) tabEl.classList.remove('hidden');
+
+            document.querySelectorAll('.menu-btn').forEach(btn => {
+                btn.classList.remove('bg-blue-600', 'text-white', 'font-medium');
+                btn.classList.add('text-gray-300', 'hover:bg-slate-800');
+            });
+            const activeBtn = document.getElementById(`btn-${tabId}`);
+            if(activeBtn) {
+                activeBtn.classList.remove('text-gray-300', 'hover:bg-slate-800');
+                activeBtn.classList.add('bg-blue-600', 'text-white', 'font-medium');
+            }
+            
+            renderAllSections();
+            applyLockStateUI();
+        }
+    </script>
+</body>
+</html>
